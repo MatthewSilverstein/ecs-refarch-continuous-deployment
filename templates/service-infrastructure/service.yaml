@@ -3,9 +3,6 @@ AWSTemplateFormatVersion: 2010-09-09
 
 
 Parameters:
-  Cluster:
-    Type: String
-
   DesiredCount:
     Type: Number
     Default: 1
@@ -17,15 +14,8 @@ Parameters:
       - Fargate
       - EC2
 
-  TargetGroup:
+  StageName:
     Type: String
-
-  SourceSecurityGroup:
-    Type: AWS::EC2::SecurityGroup::Id
-
-  Subnets:
-    Type: List<AWS::EC2::Subnet::Id>
-
 
 Conditions:
   Fargate: !Equals [ !Ref LaunchType, "Fargate" ]
@@ -54,6 +44,9 @@ Resources:
       LogGroupName: !Sub /ecs/${AWS::StackName}
 
   FargateService:
+    DependsOn:
+      - TargetGroup
+      - ListenerRule
     Type: AWS::ECS::Service
     Condition: Fargate
     Properties:
@@ -64,9 +57,11 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref SourceSecurityGroup
-          Subnets: !Ref Subnets
+          SecurityGroups: 
+            - !Ref SecurityGroup
+          Subnets:
+            - !Ref Subnet1
+            - !Ref Subnet2
       LoadBalancers:
         - ContainerName: simple-app
           ContainerPort: 80
@@ -129,7 +124,9 @@ Resources:
       Volumes:
         - Name: my-vol
 
-
 Outputs:
   Service:
     Value: !If [ Fargate, !Ref FargateService, !Ref EC2Service ]
+    Export:
+      Name:
+        Fn::Sub: "${StageName}-Service"

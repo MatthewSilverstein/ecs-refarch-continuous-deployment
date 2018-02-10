@@ -18,14 +18,8 @@ Parameters:
     Type: Number
     Default: 2
 
-  Subnets:
-    Type: List<AWS::EC2::Subnet::Id>
-
-  SourceSecurityGroup:
-    Type: AWS::EC2::SecurityGroup::Id
-
-  VpcId:
-    Type: AWS::EC2::VPC::Id
+  StageName:
+    Type: String
 
 
 Conditions:
@@ -95,9 +89,9 @@ Resources:
     Properties:
       GroupDescription: !Sub ${AWS::StackName}-hosts
       SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref SourceSecurityGroup
+        - SourceSecurityGroupId: !Ref SecurityGroup
           IpProtocol: -1
-      VpcId: !Ref VpcId
+      VpcId: !Ref VPC
 
   Cluster:
     Type: AWS::ECS::Cluster
@@ -108,7 +102,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Condition: EC2
     Properties:
-      VPCZoneIdentifier: !Ref Subnets
+      VPCZoneIdentifier: !Join [ ",", [ !Ref Subnet1, !Ref Subnet2 ] ]
       LaunchConfigurationName: !Ref LaunchConfiguration
       MinSize: !Ref ClusterSize
       MaxSize: !Ref ClusterSize
@@ -176,3 +170,6 @@ Resources:
 Outputs:
   ClusterName:
       Value: !Ref Cluster
+      Export:
+        Name:
+          Fn::Sub: "${StageName}-ClusterName"

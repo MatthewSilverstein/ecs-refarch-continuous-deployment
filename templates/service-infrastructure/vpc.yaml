@@ -3,7 +3,7 @@ AWSTemplateFormatVersion: 2010-09-09
 
 
 Parameters:
-  Name:
+  VpcName:
     Type: String
 
   VpcCIDR:
@@ -23,14 +23,14 @@ Resources:
       CidrBlock: !Ref VpcCIDR
       Tags:
         - Key: Name
-          Value: !Ref Name
+          Value: !Ref VpcName
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: !Ref Name
+          Value: !Ref VpcName
 
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -47,7 +47,7 @@ Resources:
       CidrBlock: !Ref Subnet1CIDR
       Tags:
         - Key: Name
-          Value: !Sub ${Name} (Public)
+          Value: !Sub ${VpcName} (Public)
 
   Subnet2:
     Type: AWS::EC2::Subnet
@@ -58,7 +58,7 @@ Resources:
       CidrBlock: !Ref Subnet2CIDR
       Tags:
         - Key: Name
-          Value: !Sub ${Name} (Public)
+          Value: !Sub ${VpcName} (Public)
 
   RouteTable:
     Type: AWS::EC2::RouteTable
@@ -66,7 +66,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Ref Name
+          Value: !Ref VpcName
 
   DefaultRoute:
     Type: AWS::EC2::Route
@@ -86,10 +86,3 @@ Resources:
     Properties:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref Subnet2
-
-
-Outputs:
-  Subnets:
-    Value: !Join [ ",", [ !Ref Subnet1, !Ref Subnet2 ] ]
-  VpcId:
-    Value: !Ref VPC

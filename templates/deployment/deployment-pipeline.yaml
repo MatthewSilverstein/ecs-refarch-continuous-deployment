@@ -16,12 +16,11 @@ Parameters:
   GitHubUser:
     Type: String
 
-  Cluster:
+  AlphaStageName:
     Type: String
 
-  Service:
+  BetaStageName:
     Type: String
-
 
 Resources:
   Repository:
@@ -184,22 +183,44 @@ Resources:
               OutputArtifacts:
                 - Name: BuildOutput
               RunOrder: 1
-        - Name: Deploy
+        - Name: DeployAlpha
           Actions:
-            - Name: Deploy
+            - Name: DeployAlpha
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
                 Version: 1
                 Provider: ECS
               Configuration:
-                ClusterName: !Ref Cluster
-                ServiceName: !Ref Service
+                ClusterName:
+                  Fn::ImportValue:
+                    !Sub "${AlphaStageName}-ClusterName"
+                ServiceName:
+                  Fn::ImportValue:
+                    !Sub "${AlphaStageName}-Service"
                 FileName: images.json
               InputArtifacts:
                 - Name: BuildOutput
               RunOrder: 1
-
+        - Name: DeployBeta
+          Actions:
+            - Name: DeployBeta
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ECS
+              Configuration:
+                ClusterName:
+                  Fn::ImportValue:
+                    !Sub "${BetaStageName}-ClusterName"
+                ServiceName:
+                  Fn::ImportValue:
+                    !Sub "${BetaStageName}-Service"
+                FileName: images.json
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
 
 Outputs:
   PipelineUrl:

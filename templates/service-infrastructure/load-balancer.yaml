@@ -2,21 +2,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 
-Parameters:
-  LaunchType:
-    Type: String
-    Default: Fargate
-    AllowedValues:
-      - Fargate
-      - EC2
-
-  Subnets:
-    Type: List<AWS::EC2::Subnet::Id>
-
-  VpcId:
-    Type: String
-
-
 Conditions:
   EC2: !Equals [ !Ref LaunchType, "EC2" ]
 
@@ -31,12 +16,14 @@ Resources:
           IpProtocol: "TCP"
           FromPort: 80
           ToPort: 80
-      VpcId: !Ref VpcId
+      VpcId: !Ref VPC
 
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Subnets: !Ref Subnets
+      Subnets: 
+        - !Ref Subnet1
+        - !Ref Subnet2
       SecurityGroups:
         - !Ref SecurityGroup
 
@@ -54,7 +41,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     DependsOn: LoadBalancer
     Properties:
-      VpcId: !Ref VpcId
+      VpcId: !Ref VPC
       Port: 80
       Protocol: HTTP
       Matcher:
@@ -84,12 +71,6 @@ Resources:
 
 
 Outputs:
-  TargetGroup:
-    Value: !Ref TargetGroup
-
   ServiceUrl:
     Description: URL of the load balancer for the sample service.
     Value: !Sub http://${LoadBalancer.DNSName}
-
-  SecurityGroup:
-    Value: !Ref SecurityGroup
