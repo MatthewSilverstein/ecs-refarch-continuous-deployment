@@ -1,0 +1,1 @@
+python ../cfn-preprocessor/main.py -d infrastructure/deployment/templates -o infrastructure/deployment/outputs/deployment-pipeline-output.js

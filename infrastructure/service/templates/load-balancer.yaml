@@ -2,10 +2,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 
-Conditions:
-  EC2: !Equals [ !Ref LaunchType, "EC2" ]
-
-
 Resources:
   SecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
@@ -51,7 +47,7 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
-      TargetType: !If [ EC2, "instance", "ip" ]
+      TargetType: "ip"
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: 30

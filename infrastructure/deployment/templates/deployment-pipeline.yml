@@ -1,0 +1,234 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+
+
+Parameters:
+  GitHubRepo:
+    Type: String
+
+  GitHubBranch:
+    Type: String
+
+  GitHubToken:
+    Type: String
+    NoEcho: true
+
+  GitHubUser:
+    Type: String
+
+  AlphaStageName:
+    Type: String
+
+  BetaStageName:
+    Type: String
+
+Resources:
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource:
+                  - !Sub arn:aws:s3:::${ArtifactBucket}/*
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:DescribeTaskDefinition
+                  - ecs:DescribeTasks
+                  - ecs:ListTasks
+                  - ecs:RegisterTaskDefinition
+                  - ecs:UpdateService
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                  - iam:PassRole
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStacks
+                  - cloudformation:GetTemplate
+                  - cloudformation:UpdateStack
+              - Resource: "*"
+                Effect: Allow
+                Action: "*"
+  CloudFormationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action: "*"
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: App
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref GitHubUser
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubToken
+              OutputArtifacts:
+                - Name: App
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildDockerBuild
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+        - Name: Alpha
+          Actions:
+            - Name: AlphaInfrastructureCreateChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                RoleArn: !GetAtt [CloudFormationServiceRole, Arn]
+                Capabilities: CAPABILITY_NAMED_IAM
+                StackName: !Ref AlphaStageName
+                ChangeSetName: !Sub "${AlphaStageName}-ChangeSet"
+                TemplateConfiguration: "BuildOutput::service-infrastructure-parameter-overrides-alpha.properties"
+                TemplatePath: "BuildOutput::service-infrastructure-output.js"
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+            - Name: AlphaInfrastructureExecuteChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                ChangeSetName: !Sub "${AlphaStageName}-ChangeSet"
+                RoleArn: !GetAtt [CloudFormationServiceRole, Arn]
+                StackName: !Ref AlphaStageName
+              RunOrder: 2
+            - Name: AlphaDeployContainer
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ECS
+              Configuration:
+                ClusterName:
+                  Fn::ImportValue:
+                    !Sub "${AlphaStageName}-ClusterName"
+                ServiceName:
+                  Fn::ImportValue:
+                    !Sub "${AlphaStageName}-Service"
+                FileName: images.json
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 3
+        - Name: Beta
+          Actions:
+            - Name: BetaInfrastructureCreateChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                RoleArn: !GetAtt [CloudFormationServiceRole, Arn]
+                Capabilities: CAPABILITY_NAMED_IAM
+                StackName: !Ref BetaStageName
+                ChangeSetName: !Sub "${BetaStageName}-ChangeSet"
+                TemplateConfiguration: "BuildOutput::service-infrastructure-parameter-overrides-beta.properties"
+                TemplatePath: "BuildOutput::service-infrastructure-output.js"
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+            - Name: BetaInfrastructureExecuteChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                ChangeSetName: !Sub "${BetaStageName}-ChangeSet"
+                RoleArn: !GetAtt [CloudFormationServiceRole, Arn]
+                StackName: !Ref BetaStageName
+              RunOrder: 2
+            - Name: BetaDeployContainer
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ECS
+              Configuration:
+                ClusterName:
+                  Fn::ImportValue:
+                    !Sub "${BetaStageName}-ClusterName"
+                ServiceName:
+                  Fn::ImportValue:
+                    !Sub "${BetaStageName}-Service"
+                FileName: images.json
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 3
+
+Outputs:
+  PipelineUrl:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}

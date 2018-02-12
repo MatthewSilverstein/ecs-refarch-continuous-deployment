@@ -12,16 +12,9 @@ Parameters:
     Default: Fargate
     AllowedValues:
       - Fargate
-      - EC2
 
   StageName:
     Type: String
-
-Conditions:
-  Fargate: !Equals [ !Ref LaunchType, "Fargate" ]
-
-  EC2: !Equals [ !Ref LaunchType, "EC2" ]
-
 
 Resources:
   TaskExecutionRole:
@@ -48,7 +41,6 @@ Resources:
       - TargetGroup
       - ListenerRule
     Type: AWS::ECS::Service
-    Condition: Fargate
     Properties:
       Cluster: !Ref Cluster
       DesiredCount: !Ref DesiredCount
@@ -67,28 +59,15 @@ Resources:
           ContainerPort: 80
           TargetGroupArn: !Ref TargetGroup
 
-  EC2Service:
-    Type: AWS::ECS::Service
-    Condition: EC2
-    Properties:
-      Cluster: !Ref Cluster
-      DesiredCount: !Ref DesiredCount
-      TaskDefinition: !Ref TaskDefinition
-      LaunchType: EC2
-      LoadBalancers:
-        - ContainerName: simple-app
-          ContainerPort: 80
-          TargetGroupArn: !Ref TargetGroup
-
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub ${AWS::StackName}-simple-app
       RequiresCompatibilities:
-        - !If [ Fargate, "FARGATE", "EC2" ]
+        - "FARGATE"
       Memory: 512
       Cpu: 256
-      NetworkMode: !If [ Fargate, "awsvpc", "bridge" ]
+      NetworkMode: "awsvpc"
       ExecutionRoleArn: !Ref TaskExecutionRole
       ContainerDefinitions:
         - Name: simple-app
@@ -126,7 +105,7 @@ Resources:
 
 Outputs:
   Service:
-    Value: !If [ Fargate, !Ref FargateService, !Ref EC2Service ]
+    Value: !Ref FargateService
     Export:
       Name:
         Fn::Sub: "${StageName}-Service"
