@@ -1,16 +1,14 @@
 # Overview
+Create a fully managed continuous deployment pipeline to deploy containers to fargate services.
+
 Based off the aws labs tutorial: https://github.com/awslabs/ecs-refarch-continuous-deployment
+Original tutorial readme can be found at TUTORIAL_README.md
 
-Tutorial readme can be found at TUTORIAL_README.md
+# Commands to build this project
+* set the correct github properties for deployment pipeline in the infrastructure/deployment/config/parameter-overrides.properties file
+ * make sure to locally add the github secret access token to infrastructure parameter-overrides-dev.properties, GitHubToken=***secretaccesstoken****
 
-There are two repositories for this project:
-* the infrastructure: https://github.com/MatthewSilverstein/ecs-refarch-continuous-deployment
-* the app: htetps://github.com/MatthewSilverstein/ecs-demo-php-simple-app
-
-All commands for this tutorial are done from this repository. Idea is that this repository creates the infrastructure to deploy the app. the other repository is the app that gets deployed.
-
-# Commands to replicate tutorial
-
-* locally add the github secret access token to parameter-overrides-dev.properties, GitHubToken=***secretaccesstoken****
-
-* aws cloudformation deploy --template-file ecs-refarch-continuous-deployment.yaml --stack-name my-ecs-stack --capabilities CAPABILITY_IAM --parameter-overrides  $(cat parameter-overrides-dev.properties)
+* generate the deployment pipeline template
+ * ./infrastructure/deployment/generate-template.sh
+* deploy the pipeline
+ * ./infrastructure/deployment/deploy-pipeline.sh
